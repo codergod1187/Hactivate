@@ -25,6 +25,6 @@ while running:
         if event.type == pygame.QUIT:
             running = False
 
-    pygame.display.update() 
+    pygame.display.update()  # Update display
 
 pygame.quit()
