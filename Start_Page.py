@@ -8,7 +8,7 @@ screen = pygame.display.set_mode((800, 650))
 pygame.display.set_caption("TradeTactiX")
 
 # Load images
-start_img = pygame.image.load("Start_Trade.png").convert_alpha()
+start_img = pygame.image.load("Start_Page.png").convert_alpha()
 exit_img = pygame.image.load("Exit.png").convert_alpha()  # Make sure you have "exit.png"
 
 class Button:
