@@ -5,6 +5,30 @@ import matplotlib.pyplot as plt
 import yfinance as yf
 import io
 import base64
+from datetime import datetime
+
+# Function to load the saved balance
+def load_balance():
+    try:
+        with open("balance.txt", "r") as file:
+            balance = float(file.read().strip())  # Read balance from file
+            return balance
+    except FileNotFoundError:
+        # If the file doesn't exist, return the default balance
+        return 100000
+
+# Function to save the balance
+def save_balance(balance):
+    with open("balance.txt", "w") as file:
+        file.write(f"{balance:.2f}")
+
+# Initial balance loaded from file
+balance = load_balance()
+
+# Function to log actions (including balance)
+def log_balance(action, stock_symbol, price, balance):
+    with open("balance_log.txt", "a") as log_file:
+        log_file.write(f"{datetime.now()} - {action} {stock_symbol} at ${price:.2f}, Remaining Balance: ${balance:.2f}\n")
 
 # Function to fetch stock data and plot candlestick chart with moving averages
 def plot_stock(stock_symbol):
@@ -43,11 +67,28 @@ def plot_stock(stock_symbol):
 
 # Function to handle "Buy" action
 def buy_stock(stock_symbol, price):
-    messagebox.showinfo("Action", f"Bought 1 share of {stock_symbol} at ${price:.2f}")
+    global balance
+    if balance >= price:
+        balance -= price
+        log_balance("Bought", stock_symbol, price, balance)  # Log the action
+        save_balance(balance)  # Save the updated balance
+        messagebox.showinfo("Action", f"Bought 1 share of {stock_symbol} at ${price:.2f}. Remaining balance: ${balance:.2f}")
+        update_balance_label()
+    else:
+        messagebox.showwarning("Insufficient Funds", "You do not have enough balance to make this purchase.")
 
 # Function to handle "Sell" action
 def sell_stock(stock_symbol, price):
-    messagebox.showinfo("Action", f"Sold 1 share of {stock_symbol} at ${price:.2f}")
+    global balance
+    balance += price
+    log_balance("Sold", stock_symbol, price, balance)  # Log the action
+    save_balance(balance)  # Save the updated balance
+    messagebox.showinfo("Action", f"Sold 1 share of {stock_symbol} at ${price:.2f}. New balance: ${balance:.2f}")
+    update_balance_label()
+
+# Function to update balance label
+def update_balance_label():
+    balance_label.config(text=f"Balance: ${balance:.2f}")
 
 # Function to display the stock chart and details in the Tkinter window
 def display_stock():
@@ -77,7 +118,7 @@ def display_stock():
         chart_label.image = stock_img_tk  # Keep a reference to avoid garbage collection
         chart_label.pack(pady=20)
 
-        # Optionally, display stock price and details (can add more details as needed)
+        # Display latest price
         stock_data = yf.Ticker(stock_symbol).history(period="1d")
         latest_price = stock_data['Close'].iloc[-1]
 
@@ -104,7 +145,11 @@ stock_symbol_entry.pack(pady=10)
 
 # Load images for the buttons (make sure the images are in the same directory or provide the full path)
 img_buy = ImageTk.PhotoImage(Image.open("Buy.png").resize((30, 30)))  # Resizing image to fit the button
-img_sell = ImageTk.PhotoImage(Image.open("Sell .png").resize((30, 30)))
+img_sell = ImageTk.PhotoImage(Image.open("Sell.png").resize((30, 30)))
+
+# Create balance label
+balance_label = Label(window, text=f"Balance: ${balance:.2f}", font=("Arial", 14))
+balance_label.pack(pady=10)
 
 # Button to fetch and display stock chart
 fetch_button = Button(window, text="Fetch Stock Data", font=("Arial", 12), command=display_stock)
