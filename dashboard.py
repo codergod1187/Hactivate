@@ -1,199 +1,190 @@
-import tkinter as tk
-from tkinter import Label, Entry, Button, messagebox
-from PIL import Image, ImageTk
-import matplotlib.pyplot as plt
-import yfinance as yf
-import io
-import base64
-from datetime import datetime
+import pygame
+import stock_data  
+import importlib
+import time
+import os  # To check if files exist
 
-# Function to load the saved balance from a file
-def load_balance():
-    try:
-        with open("balance.txt", "r") as file:
-            balance = float(file.read().strip())  # Read balance from file and convert to float
-            return balance
-    except FileNotFoundError:
-        # If the file doesn't exist, return the default balance
-        return 100000
+pygame.init()
 
-# Function to save the balance to a file
-def save_balance(balance):
-    with open("balance.txt", "w") as file:
-        file.write(f"{balance:.2f}")  # Save balance to file with two decimal places
+screen = pygame.display.set_mode((1000, 1000), pygame.RESIZABLE)  
+WIDTH, HEIGHT = screen.get_size()
+pygame.display.set_caption("Stock Market Simulator")
 
-# Initial balance loaded from the file
-balance = load_balance()
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+GREEN = (34, 177, 76)
+RED = (200, 0, 0)
+PURPLE = (120, 100, 200)
+LIGHT_GREY = (200, 200, 200)  
+HOVER_COLOR = (220, 220, 220)  
+CLICK_LIGHTER = (230, 230, 230)  
 
-# Portfolio (inventory) - stores stock symbols and quantities
-portfolio = {}
+title_font = pygame.font.SysFont("Arial", 40, bold=True)
+stock_font = pygame.font.SysFont("Arial", 25)
 
-# Function to log actions (including balance and portfolio updates)
-def log_balance(action, stock_symbol, price, balance, portfolio):
-    with open("balance_log.txt", "a") as log_file:
-        log_file.write(f"{datetime.now()} - {action} {stock_symbol} at ${price:.2f}, Remaining Balance: ${balance:.2f}, Portfolio: {portfolio}\n")
-
-# Function to fetch stock data and plot candlestick chart with moving averages
-def plot_stock(stock_symbol):
-    try:
-        # Fetch stock data from Yahoo Finance
-        stock_data = yf.download(stock_symbol, start='2020-01-01', end='2025-01-01')
-
-        # Calculate moving averages
-        stock_data['MA_10'] = stock_data['Close'].rolling(window=10).mean()
-        stock_data['MA_20'] = stock_data['Close'].rolling(window=20).mean()
-
-        # Create candlestick chart
-        fig = plt.figure(figsize=(7, 5))
-        ax1 = fig.add_subplot(111)
-
-        # Plot the closing price and moving averages
-        ax1.plot(stock_data['Close'], label=f'{stock_symbol} Close', color='black')
-        ax1.plot(stock_data['MA_10'], label='MA 10', color='orange')
-        ax1.plot(stock_data['MA_20'], label='MA 20', color='green')
-        
-        # Add labels and legend
-        ax1.set_title(f'{stock_symbol} Stock Price and Moving Averages')
-        ax1.set_xlabel('Date')
-        ax1.set_ylabel('Price (USD)')
-        ax1.legend()
-        ax1.grid(True)
-
-        # Save plot to a BytesIO object and encode as base64
-        img = io.BytesIO()
-        plt.savefig(img, format='png', bbox_inches='tight')
-        img.seek(0)
-        return base64.b64encode(img.getvalue()).decode('utf8')  # Return base64-encoded image
-
-    except Exception as e:
-        # Show error message if fetching data fails
-        messagebox.showerror("Error", f"Failed to fetch stock data: {e}")
+# Function to load images safely
+def load_image(filename, size=None):
+    if os.path.exists(filename):
+        img = pygame.image.load(filename)
+        if size:
+            img = pygame.transform.scale(img, size)
+        return img
+    else:
+        print(f"Warning: {filename} not found!")  # Debugging if an image is missing
         return None
 
-# Function to handle the "Buy" action
-def buy_stock(stock_symbol, price):
-    global balance, portfolio
-    if balance >= price:  # Check if there is enough balance
-        balance -= price  # Deduct the price of the stock from the balance
-        # Add stock to portfolio or increase quantity if already owned
-        if stock_symbol in portfolio:
-            portfolio[stock_symbol] += 1
+# Load images
+user_img = load_image("user.png")
+trade_img = load_image("trade.png")
+dashboard_img = load_image("dashboard.png")
+
+# Load stock logos (Crypto logos NOT included)
+stock_logo_size = (40, 40)
+stock_images = {
+    "AAPL": load_image("AAPL_STK.png", stock_logo_size),
+    "NVDA": load_image("NVDA_STK.png", stock_logo_size),
+    "GOOGL": load_image("GOOGL_STK.png", stock_logo_size),
+    "INTC": load_image("INTC_STK.png", stock_logo_size),
+    "Gold": load_image("GOLD_STK.png", stock_logo_size)
+}
+
+# Resize bottom buttons
+if user_img: user_img = pygame.transform.scale(user_img, (50, 50))
+if trade_img: trade_img = pygame.transform.scale(trade_img, (50, 50))
+if dashboard_img: dashboard_img = pygame.transform.scale(dashboard_img, (50, 50))
+
+def update_button_positions():
+    global WIDTH, HEIGHT, button_y, user_button, trade_button, dashboard_button
+    WIDTH, HEIGHT = screen.get_size()
+    button_y = HEIGHT - 70  
+    center_x = WIDTH // 2  
+    user_button = pygame.Rect(center_x - 100, button_y, 50, 50)
+    trade_button = pygame.Rect(center_x, button_y, 50, 50)
+    dashboard_button = pygame.Rect(center_x + 100, button_y, 50, 50)
+
+update_button_positions()
+
+trade_clicked = False  
+
+def get_stock_data():
+    importlib.reload(stock_data)  
+    return {
+        "AAPL": stock_data.AAPL_VAL,
+        "NVDA": stock_data.NVDA_VAL,
+        "GOOGL": stock_data.GOOG_VAL,
+        "BTC/USD": stock_data.BTC_VAL,
+        "ETH/USD": stock_data.ETH_VAL,
+        "Gold": stock_data.GOLD_VAL,
+        "INTC": stock_data.INTC_VAL,
+        "LTC/USD": stock_data.LTC_VAL
+    }
+
+stocks = get_stock_data()
+prev_stocks = stocks.copy()
+last_update = time.time()
+
+change_display_time = {key: (0, BLACK) for key in stocks}
+
+money = stock_data.money  
+
+running = True
+while running:
+    screen.fill(WHITE)  
+    mouse_x, mouse_y = pygame.mouse.get_pos()  
+
+    if time.time() - last_update >= 3:
+        prev_stocks = stocks.copy()  
+        stocks = get_stock_data()  
+        last_update = time.time()
+
+        for key in stocks:
+            if stocks[key] > prev_stocks[key]:  
+                change_display_time[key] = (time.time() + 1, GREEN)  
+            elif stocks[key] < prev_stocks[key]:  
+                change_display_time[key] = (time.time() + 2, RED)    
+            else:
+                change_display_time[key] = (0, BLACK)
+
+    pygame.draw.rect(screen, PURPLE, (0, 0, WIDTH, 180))
+
+    money_text = title_font.render(f"Money: ${money}", True, WHITE)
+    screen.blit(money_text, (50, 50))
+
+    trending_text = title_font.render("Trending Stocks", True, BLACK)
+    screen.blit(trending_text, (50, 120))
+
+    watchlist_text = title_font.render("Watchlist", True, BLACK)
+    screen.blit(watchlist_text, (WIDTH - 250, 120))
+
+    # Semi-transparent grey line
+    transparent_surface = pygame.Surface((WIDTH, 3), pygame.SRCALPHA)
+    transparent_surface.fill((180, 180, 180, 150))
+    screen.blit(transparent_surface, (0, 180))
+
+    y_offset = 200
+    for stock, value in stocks.items():
+        stock_rect = pygame.Rect(50, y_offset, 200, 30)  
+
+        if stock_rect.collidepoint(mouse_x, mouse_y):
+            color = HOVER_COLOR  
+        elif time.time() < change_display_time[stock][0]:  
+            color = change_display_time[stock][1]  
         else:
-            portfolio[stock_symbol] = 1
-        
-        # Log the action (buy)
-        log_balance("Bought", stock_symbol, price, balance, portfolio)
-        save_balance(balance)  # Save the updated balance to file
-        messagebox.showinfo("Action", f"Bought 1 share of {stock_symbol} at ${price:.2f}. Remaining balance: ${balance:.2f}")
-        update_balance_label()  # Update balance label in the main window
-    else:
-        messagebox.showwarning("Insufficient Funds", "You do not have enough balance to make this purchase.")  # Show warning if insufficient funds
+            color = BLACK  
 
-# Function to handle the "Sell" action
-def sell_stock(stock_symbol, price):
-    global balance, portfolio
-    if stock_symbol in portfolio and portfolio[stock_symbol] > 0:  # Check if stock is in portfolio and has a quantity > 0
-        balance += price  # Add the selling price to balance
-        portfolio[stock_symbol] -= 1  # Decrease stock quantity
-        if portfolio[stock_symbol] == 0:
-            del portfolio[stock_symbol]  # Remove stock from portfolio if quantity reaches 0
-        
-        # Log the action (sell)
-        log_balance("Sold", stock_symbol, price, balance, portfolio)
-        save_balance(balance)  # Save the updated balance to file
-        messagebox.showinfo("Action", f"Sold 1 share of {stock_symbol} at ${price:.2f}. New balance: ${balance:.2f}")
-        update_balance_label()  # Update balance label in the main window
-    else:
-        messagebox.showwarning("No Stock to Sell", f"You don't have any shares of {stock_symbol} to sell.")  # Show warning if no stock to sell
+        stock_text = stock_font.render(f"{stock}: ${value:.2f}", True, color)
+        screen.blit(stock_text, (100, y_offset))  
 
-# Function to update balance label in the main window
-def update_balance_label():
-    balance_label.config(text=f"Balance: ${balance:.2f}")  # Update label with current balance
+        if stock in stock_images and stock_images[stock]:  
+            screen.blit(stock_images[stock], (50, y_offset - 5))  
 
-# Function to display the stock chart and details in the Tkinter window
-def display_stock():
-    stock_symbol = stock_symbol_entry.get().upper()  # Get stock symbol from entry widget and convert to uppercase
-    
-    if not stock_symbol:  # Show warning if no stock symbol is entered
-        messagebox.showwarning("Input Error", "Please enter a stock symbol")
-        return
-    
-    # Plot the stock chart
-    stock_chart = plot_stock(stock_symbol)
-    
-    if stock_chart:
-        # Decode the base64 chart image
-        stock_img_data = base64.b64decode(stock_chart)
-        
-        # Open image using PIL and convert to ImageTk format for Tkinter
-        stock_img = Image.open(io.BytesIO(stock_img_data))
-        stock_img_tk = ImageTk.PhotoImage(stock_img)
+        y_offset += 50
 
-        # Create window to display chart
-        stock_window = tk.Toplevel()
-        stock_window.title(f"{stock_symbol} Stock Dashboard")
-        
-        # Add the stock chart to the window
-        chart_label = Label(stock_window, image=stock_img_tk)
-        chart_label.image = stock_img_tk  # Keep a reference to avoid garbage collection
-        chart_label.pack(pady=20)
+    # Bottom Buttons
+    user_hover = user_button.collidepoint(mouse_x, mouse_y)
+    trade_hover = trade_button.collidepoint(mouse_x, mouse_y)
+    dashboard_hover = dashboard_button.collidepoint(mouse_x, mouse_y)
 
-        # Display latest price
-        stock_data = yf.Ticker(stock_symbol).history(period="1d")
-        latest_price = stock_data['Close'].iloc[-1]
+    if user_hover:
+        pygame.draw.rect(screen, LIGHT_GREY, user_button, border_radius=5)
+    if user_img:
+        screen.blit(user_img, (user_button.x, user_button.y))
 
-        price_label = Label(stock_window, text=f"Latest Price: ${latest_price:.2f}", font=("Arial", 14))
-        price_label.pack(pady=10)
+    if trade_hover or trade_clicked:
+        pygame.draw.rect(screen, CLICK_LIGHTER if trade_clicked else LIGHT_GREY, trade_button, border_radius=5)
+    if trade_img:
+        screen.blit(trade_img, (trade_button.x, trade_button.y))
 
-        # Create Buy and Sell Buttons with images
-        buy_button = Button(stock_window, text="Buy", image=img_buy, compound="left", command=lambda: buy_stock(stock_symbol, latest_price))
-        buy_button.pack(side="left", padx=10, pady=10)
+    if dashboard_hover:
+        pygame.draw.rect(screen, LIGHT_GREY, dashboard_button, border_radius=5)
+    if dashboard_img:
+        screen.blit(dashboard_img, (dashboard_button.x, dashboard_button.y))
 
-        sell_button = Button(stock_window, text="Sell", image=img_sell, compound="left", command=lambda: sell_stock(stock_symbol, latest_price))
-        sell_button.pack(side="right", padx=10, pady=10)
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
 
-# Function to display the portfolio (inventory) of owned stocks
-def display_portfolio():
-    portfolio_window = tk.Toplevel()
-    portfolio_window.title("Your Stock Portfolio")
-    
-    # Display portfolio content
-    portfolio_text = ""
-    if portfolio:
-        for stock, qty in portfolio.items():
-            portfolio_text += f"{stock}: {qty} shares\n"
-    else:
-        portfolio_text = "Your portfolio is empty."
-    
-    portfolio_label = Label(portfolio_window, text=portfolio_text, font=("Arial", 14))
-    portfolio_label.pack(pady=20)
+        if event.type == pygame.VIDEORESIZE:  
+            screen = pygame.display.set_mode((event.w, event.h), pygame.RESIZABLE)
+            update_button_positions()  
 
-# Set up the main Tkinter window
-window = tk.Tk()
-window.title("Stock Market Simulator Dashboard")
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            for stock, value in stocks.items():
+                stock_rect = pygame.Rect(50, 200 + list(stocks.keys()).index(stock) * 50, 200, 30)
+                if stock_rect.collidepoint(event.pos):
+                    print(f"{stock} clicked!")  
 
-# Create the input field and button to enter stock symbol
-input_label = Label(window, text="Enter Stock Symbol (e.g., MSFT, AAPL):", font=("Arial", 12))
-input_label.pack(pady=20)
+            if user_button.collidepoint(event.pos):
+                print("User button clicked!")
+            elif trade_button.collidepoint(event.pos):
+                trade_clicked = True 
+                print("Trade button clicked!")
+            elif dashboard_button.collidepoint(event.pos):
+                print("Dashboard button clicked!")
 
-stock_symbol_entry = Entry(window, font=("Arial", 14), width=20)
-stock_symbol_entry.pack(pady=10)
+        if event.type == pygame.MOUSEBUTTONUP:
+            trade_clicked = False
 
-# Load images for the buttons (make sure the images are in the same directory or provide the full path)
-img_buy = ImageTk.PhotoImage(Image.open("Buy.png").resize((30, 30)))  # Resizing image to fit the button
-img_sell = ImageTk.PhotoImage(Image.open("Sell.png").resize((30, 30)))
+    pygame.display.update()
 
-# Create balance label
-balance_label = Label(window, text=f"Balance: ${balance:.2f}", font=("Arial", 14))
-balance_label.pack(pady=10)
-
-# Button to fetch and display stock chart
-fetch_button = Button(window, text="Fetch Stock Data", font=("Arial", 12), command=display_stock)
-fetch_button.pack(pady=20)
-
-# Button to display portfolio (inventory)
-portfolio_button = Button(window, text="View Portfolio", font=("Arial", 12), command=display_portfolio)
-portfolio_button.pack(pady=20)
-
-# Run the Tkinter event loop to display the window
-window.mainloop()
+pygame.quit()
