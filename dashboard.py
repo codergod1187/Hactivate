@@ -3,7 +3,7 @@ import stock_data
 import importlib
 import time
 import os
-import subprocess  # Added for opening files
+import subprocess 
 import User_Stats
 
 pygame.init()
@@ -36,12 +36,12 @@ def load_image(filename, size=None):
         print(f"Warning: {filename} not found!")
         return None
 
-# Load images
+
 user_img = load_image("user.png")
 trade_img = load_image("trade.png")
 dashboard_img = load_image("dashboard.png")
 
-# Increased size of bottom buttons (70x70 instead of 50x50)
+
 button_size = (70, 70)
 
 if user_img: user_img = pygame.transform.scale(user_img, button_size)
@@ -51,7 +51,7 @@ if dashboard_img: dashboard_img = pygame.transform.scale(dashboard_img, button_s
 def update_button_positions():
     global WIDTH, HEIGHT, button_y, user_button, trade_button, dashboard_button
     WIDTH, HEIGHT = screen.get_size()
-    button_y = HEIGHT - 90  # Adjusted for larger buttons
+    button_y = HEIGHT - 90 
     center_x = WIDTH // 2
     user_button = pygame.Rect(center_x - 120, button_y, 70, 70)
     trade_button = pygame.Rect(center_x, button_y, 70, 70)
@@ -165,16 +165,16 @@ while running:
 
             if user_button.collidepoint(event.pos):
                 print("User button clicked!")
-                subprocess.run(["python", "User_Stats.py"])  # Now opens User_Stats.py
+                subprocess.run(["python", "User_Stats.py"]) 
 
             elif trade_button.collidepoint(event.pos):
                 trade_clicked = True
                 print("Trade button clicked!")
-                subprocess.run(["python", "trade.py"])  # Opens trade.py
+                subprocess.run(["python", "trade.py"])  
 
             elif dashboard_button.collidepoint(event.pos):
                 print("Dashboard button clicked!")
-                subprocess.run(["python", "dashboard.py"])  # Opens dashboard.py
+                subprocess.run(["python", "dashboard.py"])  
 
         if event.type == pygame.MOUSEBUTTONUP:
             trade_clicked = False
