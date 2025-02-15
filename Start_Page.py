@@ -1,34 +1,34 @@
 import pygame
+import subprocess
+import os  # To handle file paths properly
 
 pygame.init()
 
-
-# Set up the screen
+# Set up display
 screen = pygame.display.set_mode((800, 650))
 pygame.display.set_caption("TradeTactiX")
 
-# Load images
-start_img = pygame.image.load("Start_Page.png").convert_alpha()
-exit_img = pygame.image.load("Exit.png").convert_alpha()  # Make sure you have "exit.png"
+# Load images from the "useless" folder
+start_img = pygame.image.load(os.path.join("useless", "Start.png")).convert_alpha()
+exit_img = pygame.image.load(os.path.join("useless", "Exit.png")).convert_alpha()
 
 class Button:
     def __init__(self, x, y, image, scale_factor=1.1):
-        self.original_image = image  # Store the original image
+        self.original_image = image
         self.image = image
         self.rect = self.image.get_rect(topleft=(x, y))
-        self.scale_factor = scale_factor  # Scale factor for hover effect
-        self.x, self.y = x, y  # Store original position
+        self.scale_factor = scale_factor
+        self.x, self.y = x, y
 
     def draw(self, surface):
-        # Hover effect
         if self.rect.collidepoint(pygame.mouse.get_pos()):
             new_size = (int(self.original_image.get_width() * self.scale_factor),
                         int(self.original_image.get_height() * self.scale_factor))
             self.image = pygame.transform.scale(self.original_image, new_size)
-            self.rect = self.image.get_rect(center=self.rect.center)  # Keep it centered
+            self.rect = self.image.get_rect(center=self.rect.center)
         else:
             self.image = self.original_image
-            self.rect = self.image.get_rect(topleft=(self.x, self.y))  # Reset to original
+            self.rect = self.image.get_rect(topleft=(self.x, self.y))
 
         surface.blit(self.image, self.rect)
 
@@ -38,11 +38,10 @@ class Button:
                 return True
         return False
 
-# Create buttons (Pass images, NOT strings)
-start_button = Button(50,250, start_img)
-exit_button = Button(400,240, exit_img)  # Added an exit button
+# Create buttons
+start_button = Button(50, 250, start_img)
+exit_button = Button(400, 240, exit_img)
 
-# Main loop
 running = True
 while running:
     screen.fill((30, 30, 30))  # Background color
@@ -51,13 +50,19 @@ while running:
     start_button.draw(screen)
     exit_button.draw(screen)
 
-    # Event handling
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+        
         if exit_button.is_clicked(event):
-            running = False  # Exit the program when exit button is clicked
+            running = False  # Close game
 
-    pygame.display.update() 
+        if start_button.is_clicked(event):
+            print("Starting Dashboard...")  
+            pygame.quit()  # Close the menu before launching dashboard
+            subprocess.run(["python", "dashboard.py"])  # Launch dashboard.py
+            exit()
+
+    pygame.display.update()
 
 pygame.quit()
